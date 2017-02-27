@@ -58,9 +58,7 @@ static void write_gpreg(target *t, uint8_t regno, uint32_t val);
 static uint32_t read_gpreg(target *t, uint8_t regno);
 
 struct cortexa_priv {
-	uint32_t base;
-	ADIv5_AP_t *apb;
-	ADIv5_AP_t *ahb;
+	volatile uint32_t *dbg;
 	struct {
 		uint32_t r[16];
 		uint32_t cpsr;
@@ -113,6 +111,9 @@ struct cortexa_priv {
 #define DBGBCR_BAS_LOW_HW        (0x3 << 5)
 #define DBGBCR_BAS_HIGH_HW       (0xc << 5)
 #define DBGBCR_EN                (1 << 0)
+
+#define DBGLAR                   (1004)
+#define DBGLAR_KEY               0xC5ACCE55
 
 /* Instruction encodings for accessing the coprocessor interface */
 #define MCR 0xee000010
@@ -186,26 +187,13 @@ static const char tdesc_cortex_a[] =
 static void apb_write(target *t, uint16_t reg, uint32_t val)
 {
 	struct cortexa_priv *priv = t->priv;
-	ADIv5_AP_t *ap = priv->apb;
-	uint32_t addr = priv->base + 4*reg;
-	//adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
-	//adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DRW, val);
-	adiv5_mem_write(ap, addr, &val, sizeof(val));
-    DEBUG("%s: reg[%d] = 0x%"PRIx32"\n", __func__, reg, val);
+    priv->dbg[reg] = val;
 }
 
 static uint32_t apb_read(target *t, uint16_t reg)
 {
 	struct cortexa_priv *priv = t->priv;
-	ADIv5_AP_t *ap = priv->apb;
-	uint32_t addr = priv->base + 4*reg;
-	//adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
-	//adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_AP_DRW, 0);
-	//return adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_DP_RDBUFF, 0);
-	uint32_t ret;
-	adiv5_mem_read(ap, &ret, addr, sizeof(ret));
-    DEBUG("%s: reg[%d] = 0x%"PRIx32"\n", __func__, reg, ret);
-	return ret;
+	return priv->dbg[reg];
 }
 
 static uint32_t va_to_pa(target *t, uint32_t va)
@@ -221,19 +209,6 @@ static uint32_t va_to_pa(target *t, uint32_t va)
 	DEBUG("%s: VA = 0x%08"PRIx32", PAR = 0x%08"PRIx32", PA = 0x%08"PRIX32"\n",
               __func__, va, par, pa);
 	return pa;
-}
-
-static void cortexa_mem_read(target *t, void *dest, target_addr src, size_t len)
-{
-	/* Clean cache before reading */
-	for (uint32_t cl = src & ~(CACHE_LINE_LENGTH-1);
-	     cl < src + len; cl += CACHE_LINE_LENGTH) {
-		write_gpreg(t, 0, cl);
-		apb_write(t, DBGITR, MCR | DCCMVAC);
-	}
-
-	ADIv5_AP_t *ahb = ((struct cortexa_priv*)t->priv)->ahb;
-	adiv5_mem_read(ahb, dest, va_to_pa(t, src), len);
 }
 
 static void cortexa_slow_mem_read(target *t, void *dest, target_addr src, size_t len)
@@ -273,18 +248,6 @@ static void cortexa_slow_mem_read(target *t, void *dest, target_addr src, size_t
 	} else {
 		apb_read(t, DBGDTRTX);
 	}
-}
-
-static void cortexa_mem_write(target *t, target_addr dest, const void *src, size_t len)
-{
-	/* Clean and invalidate cache before writing */
-	for (uint32_t cl = dest & ~(CACHE_LINE_LENGTH-1);
-	     cl < dest + len; cl += CACHE_LINE_LENGTH) {
-		write_gpreg(t, 0, cl);
-		apb_write(t, DBGITR, MCR | DCCIMVAC);
-	}
-	ADIv5_AP_t *ahb = ((struct cortexa_priv*)t->priv)->ahb;
-	adiv5_mem_write(ahb, va_to_pa(t, dest), src, len);
 }
 
 static void cortexa_slow_mem_write_bytes(target *t, target_addr dest, const uint8_t *src, size_t len)
@@ -344,42 +307,25 @@ static void cortexa_slow_mem_write(target *t, target_addr dest, const void *src,
 static bool cortexa_check_error(target *t)
 {
 	struct cortexa_priv *priv = t->priv;
-	ADIv5_AP_t *ahb = priv->ahb;
-	bool err = (ahb && (adiv5_dp_error(ahb->dp)) != 0) || priv->mmu_fault;
+	bool err = priv->mmu_fault;
 	priv->mmu_fault = false;
 	return err;
 }
 
 
-bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base)
+bool cortexa_probe(volatile uint32_t *dbg)
 {
 	target *t;
 
 	t = target_new();
-	adiv5_ap_ref(apb);
 	struct cortexa_priv *priv = calloc(1, sizeof(*priv));
 	t->priv = priv;
 	t->priv_free = free;
-	priv->apb = apb;
-	/* FIXME Find a better way to find the AHB.  This is likely to be
-	 * device specific. */
-	if (false) {
-		/* FIXME: This used to be if ((priv->ahb->idr & 0xfffe00f) == 0x4770001)
-		 * Accessing memory directly through the AHB is much faster, but can
-		 * result in data inconsistencies if the L2 cache is enabled.
-		 */
-		/* This is an AHB */
-		t->mem_read = cortexa_mem_read;
-		t->mem_write = cortexa_mem_write;
-	} else {
-		/* This is not an AHB, fall back to slow APB access */
-		//adiv5_ap_unref(priv->ahb);
-		priv->ahb = NULL;
-		t->mem_read = cortexa_slow_mem_read;
-		t->mem_write = cortexa_slow_mem_write;
-	}
 
-	priv->base = debug_base;
+	priv->dbg = dbg;
+	t->mem_read = cortexa_slow_mem_read;
+	t->mem_write = cortexa_slow_mem_write;
+
 	/* Set up APB CSW, we won't touch this again */
 	//uint32_t csw = apb->csw | ADIV5_AP_CSW_SIZE_WORD;
 	//adiv5_ap_write(apb, ADIV5_AP_CSW, csw);
@@ -416,6 +362,9 @@ bool cortexa_attach(target *t)
 
 	/* Clear any pending fault condition */
 	target_check_error(t);
+
+	/* Unlock access to MMIO interface */
+	apb_write(t, DBGLAR, DBGLAR_KEY);
 
 	/* Enable halting debug mode */
 	uint32_t dbgdscr = apb_read(t, DBGDSCR);

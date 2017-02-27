@@ -61,16 +61,11 @@ void platform_init(void)
 	printf("License GPLv3+: GNU GPL version 3 or later "
 	       "<http://gnu.org/licenses/gpl.html>\n\n");
 
-	int pmem = open("/dev/mem", O_RDWR);
-	volatile uint32_t *dbg = mmap(NULL, 0x100000, PROT_READ | PROT_WRITE, MAP_SHARED,
-	                            pmem, 0xf8800000);
-	franken_fake_ap.mmap = dbg;
-	/* Try probe ROM table.
-     * This fails with a bus stall, leaving us in a perpetual wait state.
-    adiv5_component_probe(&franken_fake_ap, 0);
-    */
-    extern bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base);
-    cortexa_probe(&franken_fake_ap, 0x92000);
+	int pmem = open("/dev/mem", O_RDWR | O_SYNC);
+	volatile uint32_t *dbg = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED,
+	                            pmem, 0xf8892000);
+    extern bool cortexa_probe(volatile uint32_t *dbg);
+    cortexa_probe(dbg);
 
 	assert(gdb_if_init() == 0);
 }
