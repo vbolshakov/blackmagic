@@ -509,6 +509,7 @@ static void cortexa_regs_write_internal(target *t)
 	}
 }
 
+#include <signal.h>
 static void cortexa_reset(target *t)
 {
 	apb_write(t, DBGVCR, 1); /* Vector catch on reset */
@@ -517,6 +518,12 @@ static void cortexa_reset(target *t)
 #define ZYNQ_SLCR_UNLOCK_KEY   0xdf0d
 #define ZYNQ_SLCR_A9_CPU_RST_CTRL 145
 #define ZYNQ_SLCR_A9_CPU_RST_CTRL_A9_RST1 (1<<1)
+
+	system("monit stop zmq_adapter_rpmsg_piksi101");
+	system("monit stop zmq_adapter_rpmsg_piksi100");
+	platform_delay(100);
+	system("modprobe -r rpmsg_piksi");
+	system("modprobe -r zynq_remoteproc");
 
 	struct cortexa_priv *priv = t->priv;
 	priv->slcr[ZYNQ_SLCR_UNLOCK] = ZYNQ_SLCR_UNLOCK_KEY;
@@ -527,6 +534,14 @@ static void cortexa_reset(target *t)
 
 	cortexa_attach(t);
 	apb_write(t, DBGVCR, 0); /* Clear vector catch */
+
+	system("modprobe zynq_remoteproc");
+	system("modprobe rpmsg_piksi");
+	platform_delay(100);
+	system("monit start zmq_adapter_rpmsg_piksi101");
+	system("monit start zmq_adapter_rpmsg_piksi100");
+
+	cortexa_halt_request(t);
 }
 
 static void cortexa_halt_request(target *t)
