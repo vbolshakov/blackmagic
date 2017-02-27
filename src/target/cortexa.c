@@ -649,7 +649,7 @@ static int cortexa_breakwatch_set(target *t, struct breakwatch *bw)
 	unsigned i;
 
 	switch (bw->type) {
-	case TARGET_BREAK_SOFT:
+	case TARGET_BREAK_SOFT:/*
 		switch (bw->size) {
 		case 2:
 			bw->reserved[0] = target_mem_read16(t, bw->addr);
@@ -661,7 +661,7 @@ static int cortexa_breakwatch_set(target *t, struct breakwatch *bw)
 			return 0;
 		default:
 			return -1;
-		}
+		}*/
 	case TARGET_BREAK_HARD:
 		if ((bw->size != 4) && (bw->size != 2))
 			return -1;
@@ -696,7 +696,7 @@ static int cortexa_breakwatch_clear(target *t, struct breakwatch *bw)
 	struct cortexa_priv *priv = t->priv;
 	unsigned i = bw->reserved[0];
 	switch (bw->type) {
-	case TARGET_BREAK_SOFT:
+	case TARGET_BREAK_SOFT:/*
 		switch (bw->size) {
 		case 2:
 			target_mem_write16(t, bw->addr, i);
@@ -706,7 +706,7 @@ static int cortexa_breakwatch_clear(target *t, struct breakwatch *bw)
 			return 0;
 		default:
 			return -1;
-		}
+		}*/
 	case TARGET_BREAK_HARD:
 		priv->hw_breakpoint_mask &= ~(1 << i);
 		apb_write(t, DBGBCR(i), 0);
