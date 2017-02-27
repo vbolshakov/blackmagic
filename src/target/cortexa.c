@@ -80,6 +80,11 @@ struct cortexa_priv {
 #define DBGDIDR                  0
 
 #define DBGVCR                   7
+#define DBGVCR_R                 (1 << 0)
+#define DBGVCR_SU                (1 << 1)
+#define DBGVCR_SP                (1 << 3)
+#define DBGVCR_SD                (1 << 4)
+
 
 #define DBGDTRRX                 32 /* DCC: Host to target */
 #define DBGITR                   33
@@ -384,6 +389,9 @@ bool cortexa_attach(target *t)
 	if(!tries)
 		return false;
 
+	/* Enable vector catch on Undefined, Prefetch abort, Data abort */
+	apb_write(t, DBGVCR, DBGVCR_SU | DBGVCR_SP | DBGVCR_SD);
+
 	/* Clear any stale breakpoints */
 	for(unsigned i = 0; i < priv->hw_breakpoint_max; i++) {
 		apb_write(t, DBGBCR(i), 0);
@@ -404,6 +412,9 @@ void cortexa_detach(target *t)
 	for(unsigned i = 0; i < priv->hw_breakpoint_max; i++) {
 		apb_write(t, DBGBCR(i), 0);
 	}
+
+	/* Disable vector catch */
+	apb_write(t, DBGVCR, 0);
 
 	/* Restore any clobbered registers */
 	cortexa_regs_write_internal(t);
@@ -512,7 +523,8 @@ static void cortexa_regs_write_internal(target *t)
 #include <signal.h>
 static void cortexa_reset(target *t)
 {
-	apb_write(t, DBGVCR, 1); /* Vector catch on reset */
+	uint32_t dbgvcr = apb_read(t, DBGVCR);
+	apb_write(t, DBGVCR, dbgvcr | DBGVCR_R); /* Vector catch on reset */
 
 #define ZYNQ_SLCR_UNLOCK       2
 #define ZYNQ_SLCR_UNLOCK_KEY   0xdf0d
@@ -533,7 +545,7 @@ static void cortexa_reset(target *t)
 	platform_delay(100);
 
 	cortexa_attach(t);
-	apb_write(t, DBGVCR, 0); /* Clear vector catch */
+	apb_write(t, DBGVCR, dbgvcr); /* Clear vector catch */
 
 	system("modprobe zynq_remoteproc");
 	system("modprobe rpmsg_piksi");
