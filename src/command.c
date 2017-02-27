@@ -46,8 +46,6 @@ struct command_s {
 static bool cmd_version(void);
 static bool cmd_help(target *t);
 
-static bool cmd_jtag_scan(target *t, int argc, char **argv);
-static bool cmd_swdp_scan(void);
 static bool cmd_targets(void);
 static bool cmd_morse(void);
 static bool cmd_connect_srst(target *t, int argc, const char **argv);
@@ -65,8 +63,6 @@ static bool cmd_debug_bmp(target *t, int argc, const char **argv);
 const struct command_s cmd_list[] = {
 	{"version", (cmd_handler)cmd_version, "Display firmware version info"},
 	{"help", (cmd_handler)cmd_help, "Display help for monitor commands"},
-	{"jtag_scan", (cmd_handler)cmd_jtag_scan, "Scan JTAG chain for devices" },
-	{"swdp_scan", (cmd_handler)cmd_swdp_scan, "Scan SW-DP for devices" },
 	{"targets", (cmd_handler)cmd_targets, "Display list of available targets" },
 	{"morse", (cmd_handler)cmd_morse, "Display morse error message" },
 	{"connect_srst", (cmd_handler)cmd_connect_srst, "Configure connect under SRST: (enable|disable)" },
@@ -143,80 +139,6 @@ bool cmd_help(target *t)
 	target_command_help(t);
 
 	return true;
-}
-
-static bool cmd_jtag_scan(target *t, int argc, char **argv)
-{
-	(void)t;
-	uint8_t irlens[argc];
-
-	gdb_outf("Target voltage: %s\n", platform_target_voltage());
-
-	if (argc > 1) {
-		/* Accept a list of IR lengths on command line */
-		for (int i = 1; i < argc; i++)
-			irlens[i-1] = atoi(argv[i]);
-		irlens[argc-1] = 0;
-	}
-
-	if(connect_assert_srst)
-		platform_srst_set_val(true); /* will be deasserted after attach */
-
-	int devs = -1;
-	volatile struct exception e;
-	TRY_CATCH (e, EXCEPTION_ALL) {
-		devs = jtag_scan(argc > 1 ? irlens : NULL);
-	}
-	switch (e.type) {
-	case EXCEPTION_TIMEOUT:
-		gdb_outf("Timeout during scan. Is target stuck in WFI?\n");
-		break;
-	case EXCEPTION_ERROR:
-		gdb_outf("Exception: %s\n", e.msg);
-		break;
-	}
-
-	if(devs <= 0) {
-		platform_srst_set_val(false);
-		gdb_out("JTAG device scan failed!\n");
-		return false;
-	}
-	cmd_targets();
-	morse(NULL, false);
-	return true;
-}
-
-bool cmd_swdp_scan(void)
-{
-	gdb_outf("Target voltage: %s\n", platform_target_voltage());
-
-	if(connect_assert_srst)
-		platform_srst_set_val(true); /* will be deasserted after attach */
-
-	int devs = -1;
-	volatile struct exception e;
-	TRY_CATCH (e, EXCEPTION_ALL) {
-		devs = adiv5_swdp_scan();
-	}
-	switch (e.type) {
-	case EXCEPTION_TIMEOUT:
-		gdb_outf("Timeout during scan. Is target stuck in WFI?\n");
-		break;
-	case EXCEPTION_ERROR:
-		gdb_outf("Exception: %s\n", e.msg);
-		break;
-	}
-
-	if(devs <= 0) {
-		platform_srst_set_val(false);
-		gdb_out("SW-DP scan failed!\n");
-		return false;
-	}
-
-	cmd_targets();
-	morse(NULL, false);
-	return true;
-
 }
 
 static void display_target(int i, target *t, void *context)
