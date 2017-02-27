@@ -64,8 +64,10 @@ void platform_init(void)
 	int pmem = open("/dev/mem", O_RDWR | O_SYNC);
 	volatile uint32_t *dbg = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED,
 	                            pmem, 0xf8892000);
-    extern bool cortexa_probe(volatile uint32_t *dbg);
-    cortexa_probe(dbg);
+	volatile uint32_t *slcr = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED,
+	                            pmem, 0xf8000000);
+    extern bool cortexa_probe(volatile uint32_t *dbg, volatile uint32_t *slcr);
+    cortexa_probe(dbg, slcr);
 
 	assert(gdb_if_init() == 0);
 }

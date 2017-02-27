@@ -59,6 +59,7 @@ static uint32_t read_gpreg(target *t, uint8_t regno);
 
 struct cortexa_priv {
 	volatile uint32_t *dbg;
+	volatile uint32_t *slcr;
 	struct {
 		uint32_t r[16];
 		uint32_t cpsr;
@@ -77,6 +78,8 @@ struct cortexa_priv {
 
 /* Debug APB registers */
 #define DBGDIDR                  0
+
+#define DBGVCR                   7
 
 #define DBGDTRRX                 32 /* DCC: Host to target */
 #define DBGITR                   33
@@ -313,7 +316,7 @@ static bool cortexa_check_error(target *t)
 }
 
 
-bool cortexa_probe(volatile uint32_t *dbg)
+bool cortexa_probe(volatile uint32_t *dbg, volatile uint32_t *slcr)
 {
 	target *t;
 
@@ -323,6 +326,7 @@ bool cortexa_probe(volatile uint32_t *dbg)
 	t->priv_free = free;
 
 	priv->dbg = dbg;
+	priv->slcr = slcr;
 	t->mem_read = cortexa_slow_mem_read;
 	t->mem_write = cortexa_slow_mem_write;
 
@@ -507,34 +511,22 @@ static void cortexa_regs_write_internal(target *t)
 
 static void cortexa_reset(target *t)
 {
-	/* This mess is Xilinx Zynq specific
-	 * See Zynq-7000 TRM, Xilinx doc UG585
-	 */
-#define ZYNQ_SLCR_UNLOCK       0xf8000008
+	apb_write(t, DBGVCR, 1); /* Vector catch on reset */
+
+#define ZYNQ_SLCR_UNLOCK       2
 #define ZYNQ_SLCR_UNLOCK_KEY   0xdf0d
-#define ZYNQ_SLCR_PSS_RST_CTRL 0xf8000200
-	target_mem_write32(t, ZYNQ_SLCR_UNLOCK, ZYNQ_SLCR_UNLOCK_KEY);
-	target_mem_write32(t, ZYNQ_SLCR_PSS_RST_CTRL, 1);
+#define ZYNQ_SLCR_A9_CPU_RST_CTRL 145
+#define ZYNQ_SLCR_A9_CPU_RST_CTRL_A9_RST1 (1<<1)
 
-	/* Try hard reset too */
-	platform_srst_set_val(true);
-	platform_srst_set_val(false);
-
-	/* Spin until Xilinx reconnects us */
-	platform_timeout timeout;
-	platform_timeout_set(&timeout, 1000);
-	volatile struct exception e;
-	do {
-		TRY_CATCH (e, EXCEPTION_ALL) {
-			apb_read(t, DBGDIDR);
-		}
-	} while (!platform_timeout_is_expired(&timeout) && e.type == EXCEPTION_ERROR);
-	if (e.type == EXCEPTION_ERROR)
-		raise_exception(e.type, e.msg);
-
+	struct cortexa_priv *priv = t->priv;
+	priv->slcr[ZYNQ_SLCR_UNLOCK] = ZYNQ_SLCR_UNLOCK_KEY;
+	priv->slcr[ZYNQ_SLCR_A9_CPU_RST_CTRL] |= ZYNQ_SLCR_A9_CPU_RST_CTRL_A9_RST1;
+	platform_delay(100);
+	priv->slcr[ZYNQ_SLCR_A9_CPU_RST_CTRL] &= ~ZYNQ_SLCR_A9_CPU_RST_CTRL_A9_RST1;
 	platform_delay(100);
 
 	cortexa_attach(t);
+	apb_write(t, DBGVCR, 0); /* Clear vector catch */
 }
 
 static void cortexa_halt_request(target *t)
