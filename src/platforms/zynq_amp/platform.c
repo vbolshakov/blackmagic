@@ -24,13 +24,53 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
+#include "target/adiv5.h"
+
+ADIv5_AP_t franken_fake_ap;
+
+/*
+Description of DAP ROM table, from Zynq 7000 TRM, Table 25-5
+
+DAP ROM 0xF880_0000
+ETB 0xF880_1000
+CTI (connected to ETB, TPIU) 0xF880_2000
+TPIU 0xF880_3000
+Funnel 0xF880_4000
+ITM 0xF880_5000
+CTI (connected to FTM) 0xF880_9000
+FTM 0xF880_B000
+Cortex-A9 ROM 0xF888_0000
+CPU0 debug logic 0xF889_0000
+CPU0 PMU 0xF889_1000
+CPU1 debug logic 0xF889_2000
+CPU1 PMU 0xF889_3000
+CTI (connected to CPU0, PTM0) 0xF889_8000
+CTI (connected to CPU1, PTM1) 0xF889_9000
+PTM0 (for CPU0) 0xF889_C000
+PTM1 (for CPU1) 0xF889_D000
+ */
 void platform_init(void)
 {
 	printf("\nBlack Magic Probe (" FIRMWARE_VERSION ")\n");
 	printf("Copyright (C) 2015  Black Sphere Technologies Ltd.\n");
 	printf("License GPLv3+: GNU GPL version 3 or later "
 	       "<http://gnu.org/licenses/gpl.html>\n\n");
+
+	int pmem = open("/dev/mem", O_RDWR);
+	volatile uint32_t *dbg = mmap(NULL, 0x100000, PROT_READ | PROT_WRITE, MAP_SHARED,
+	                            pmem, 0xf8800000);
+	franken_fake_ap.mmap = dbg;
+	/* Try probe ROM table.
+     * This fails with a bus stall, leaving us in a perpetual wait state.
+    adiv5_component_probe(&franken_fake_ap, 0);
+    */
+    extern bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base);
+    cortexa_probe(&franken_fake_ap, 0x92000);
 
 	assert(gdb_if_init() == 0);
 }
@@ -58,4 +98,3 @@ uint32_t platform_time_ms(void)
 	gettimeofday(&tv, NULL);
 	return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
 }
-

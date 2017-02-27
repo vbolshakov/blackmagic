@@ -188,8 +188,10 @@ static void apb_write(target *t, uint16_t reg, uint32_t val)
 	struct cortexa_priv *priv = t->priv;
 	ADIv5_AP_t *ap = priv->apb;
 	uint32_t addr = priv->base + 4*reg;
-	adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
-	adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DRW, val);
+	//adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
+	//adiv5_dp_low_access(ap->dp, ADIV5_LOW_WRITE, ADIV5_AP_DRW, val);
+	adiv5_mem_write(ap, addr, &val, sizeof(val));
+    DEBUG("%s: reg[%d] = 0x%"PRIx32"\n", __func__, reg, val);
 }
 
 static uint32_t apb_read(target *t, uint16_t reg)
@@ -197,9 +199,13 @@ static uint32_t apb_read(target *t, uint16_t reg)
 	struct cortexa_priv *priv = t->priv;
 	ADIv5_AP_t *ap = priv->apb;
 	uint32_t addr = priv->base + 4*reg;
-	adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
-	adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_AP_DRW, 0);
-	return adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_DP_RDBUFF, 0);
+	//adiv5_ap_write(ap, ADIV5_AP_TAR, addr);
+	//adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_AP_DRW, 0);
+	//return adiv5_dp_low_access(ap->dp, ADIV5_LOW_READ, ADIV5_DP_RDBUFF, 0);
+	uint32_t ret;
+	adiv5_mem_read(ap, &ret, addr, sizeof(ret));
+    DEBUG("%s: reg[%d] = 0x%"PRIx32"\n", __func__, reg, ret);
+	return ret;
 }
 
 static uint32_t va_to_pa(target *t, uint32_t va)
@@ -357,8 +363,6 @@ bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base)
 	priv->apb = apb;
 	/* FIXME Find a better way to find the AHB.  This is likely to be
 	 * device specific. */
-	priv->ahb = adiv5_new_ap(apb->dp, 0);
-	adiv5_ap_ref(priv->ahb);
 	if (false) {
 		/* FIXME: This used to be if ((priv->ahb->idr & 0xfffe00f) == 0x4770001)
 		 * Accessing memory directly through the AHB is much faster, but can
@@ -369,7 +373,7 @@ bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base)
 		t->mem_write = cortexa_mem_write;
 	} else {
 		/* This is not an AHB, fall back to slow APB access */
-		adiv5_ap_unref(priv->ahb);
+		//adiv5_ap_unref(priv->ahb);
 		priv->ahb = NULL;
 		t->mem_read = cortexa_slow_mem_read;
 		t->mem_write = cortexa_slow_mem_write;
@@ -377,8 +381,8 @@ bool cortexa_probe(ADIv5_AP_t *apb, uint32_t debug_base)
 
 	priv->base = debug_base;
 	/* Set up APB CSW, we won't touch this again */
-	uint32_t csw = apb->csw | ADIV5_AP_CSW_SIZE_WORD;
-	adiv5_ap_write(apb, ADIV5_AP_CSW, csw);
+	//uint32_t csw = apb->csw | ADIV5_AP_CSW_SIZE_WORD;
+	//adiv5_ap_write(apb, ADIV5_AP_CSW, csw);
 	uint32_t dbgdidr = apb_read(t, DBGDIDR);
 	priv->hw_breakpoint_max = ((dbgdidr >> 24) & 15)+1;
 

@@ -246,7 +246,7 @@ static uint32_t adiv5_mem_read32(ADIv5_AP_t *ap, uint32_t addr)
 	return ret;
 }
 
-static void adiv5_component_probe(ADIv5_AP_t *ap, uint32_t addr)
+void adiv5_component_probe(ADIv5_AP_t *ap, uint32_t addr)
 {
 	addr &= ~3;
 	uint64_t pidr = 0;
@@ -502,6 +502,11 @@ static void * extract(void *dest, uint32_t src, uint32_t val, enum align align)
 void
 adiv5_mem_read(ADIv5_AP_t *ap, void *dest, uint32_t src, size_t len)
 {
+	if (ap->mmap != NULL) {
+		//DEBUG("%s 0x%08"PRIx32" %d\n", __func__, src, len);
+		memcpy(dest, (uint8_t*)ap->mmap + src, len);
+		return;
+	}
 	uint32_t tmp;
 	uint32_t osrc = src;
 	enum align align = MIN(ALIGNOF(src), ALIGNOF(len));
@@ -533,6 +538,12 @@ adiv5_mem_read(ADIv5_AP_t *ap, void *dest, uint32_t src, size_t len)
 void
 adiv5_mem_write(ADIv5_AP_t *ap, uint32_t dest, const void *src, size_t len)
 {
+	if (ap->mmap != NULL) {
+		DEBUG("%s %p %d\n", __func__, (uint8_t*)ap->mmap + dest, len);
+		memcpy((uint8_t*)ap->mmap + dest, src, len);
+		return;
+	}
+
 	uint32_t odest = dest;
 	enum align align = MIN(ALIGNOF(dest), ALIGNOF(len));
 

@@ -149,6 +149,8 @@ typedef struct ADIv5_AP_s {
 	uint32_t cfg;
 	uint32_t base;
 	uint32_t csw;
+
+	volatile void *mmap;
 } ADIv5_AP_t;
 
 void adiv5_dp_init(ADIv5_DP_t *dp);
@@ -160,6 +162,8 @@ void adiv5_ap_ref(ADIv5_AP_t *ap);
 void adiv5_dp_unref(ADIv5_DP_t *dp);
 void adiv5_ap_unref(ADIv5_AP_t *ap);
 
+void adiv5_component_probe(ADIv5_AP_t *ap, uint32_t addr);
+
 void adiv5_ap_write(ADIv5_AP_t *ap, uint16_t addr, uint32_t value);
 uint32_t adiv5_ap_read(ADIv5_AP_t *ap, uint16_t addr);
 
@@ -169,4 +173,3 @@ void adiv5_mem_read(ADIv5_AP_t *ap, void *dest, uint32_t src, size_t len);
 void adiv5_mem_write(ADIv5_AP_t *ap, uint32_t dest, const void *src, size_t len);
 
 #endif
-
