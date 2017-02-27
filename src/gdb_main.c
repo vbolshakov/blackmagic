@@ -35,6 +35,9 @@
 #include "crc32.h"
 #include "morse.h"
 
+#include "coredump.h"
+#include <signal.h>
+
 enum gdb_signal {
 	GDB_SIGINT = 2,
 	GDB_SIGTRAP = 5,
@@ -91,15 +94,35 @@ static struct target_controller gdb_controller = {
 	.system = hostio_system,
 };
 
+volatile bool coredump_requested;
+void sigusr1_handler(int x)
+{
+	(void)x;
+	coredump_requested = true;
+}
+
 int gdb_main_loop(struct target_controller *tc, bool in_syscall)
 {
 	int size;
 	bool single_step = false;
 
+	struct sigaction usr1 = {
+		.sa_handler = sigusr1_handler,
+	};
+	sigaction(SIGUSR1, &usr1, NULL);
+
 	/* GDB protocol main loop */
 	while(1) {
 		SET_IDLE_STATE(1);
 		size = gdb_getpacket(pbuf, BUF_SIZE);
+		if (coredump_requested && (cur_target == NULL)) {
+			printf("Core dump requested\n");
+			cur_target = target_attach_n(1, &gdb_controller);
+			zynq_amp_core_dump(cur_target);
+			target_detach(cur_target);
+			cur_target = NULL;
+		}
+		coredump_requested = false;
 		SET_IDLE_STATE(0);
 		switch(pbuf[0]) {
 		/* Implementation of these is mandatory! */

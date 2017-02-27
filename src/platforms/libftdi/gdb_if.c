@@ -77,7 +77,9 @@ unsigned char gdb_if_getchar(void)
 	while(i <= 0) {
 		if(gdb_if_conn <= 0) {
 			gdb_if_conn = accept(gdb_if_serv, NULL, NULL);
-			DEBUG("Got connection\n");
+			if (gdb_if_conn <= 0)
+				return 0x04;
+			DEBUG("Got connection %d\n", gdb_if_conn);
 		}
 		i = recv(gdb_if_conn, (void*)&ret, 1, 0);
 		if(i <= 0) {

@@ -16,4 +16,8 @@ void core_note_add_arm_vfp(struct corefile *cf, const struct ARM_vfp *regs);
 void core_dump(FILE *f, struct corefile *cf);
 void core_free(struct corefile *cf);
 
+#include "general.h"
+#include "target.h"
+void zynq_amp_core_dump(target *t);
+
 #endif

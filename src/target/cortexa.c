@@ -219,6 +219,16 @@ static uint32_t va_to_pa(target *t, uint32_t va)
 	return pa;
 }
 
+void cortexa_cache_clean(target *t, target_addr src, size_t len)
+{
+	/* Clean cache before reading */
+	for (uint32_t cl = src & ~(CACHE_LINE_LENGTH-1);
+	     cl < src + len; cl += CACHE_LINE_LENGTH) {
+		write_gpreg(t, 0, cl);
+		apb_write(t, DBGITR, MCR | DCCMVAC);
+	}
+}
+
 static void cortexa_slow_mem_read(target *t, void *dest, target_addr src, size_t len)
 {
 	struct cortexa_priv *priv = t->priv;

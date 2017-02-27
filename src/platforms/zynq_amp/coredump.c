@@ -119,3 +119,49 @@ int main(void)
     fclose(f);
 }
 #endif
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#include "general.h"
+#include "target.h"
+extern void cortexa_cache_clean(target *t, target_addr src, size_t len);
+
+void zynq_amp_core_dump(target *t)
+{
+/*  From Piksi LD script:
+    flash : org = 0x1c000000, len = 0x02000000
+    vring : org = 0x1e000000, len = 0x00800000
+    ram0  : org = 0x1e800000, len = 0x01800000
+*/
+    const struct section {
+        uint32_t base;
+        uint32_t size;
+    } sections[] = {
+        {0x1c000000, 0x02000000},
+        {0x1e000000, 0x00800000},
+        {0x1e800000, 0x01800000},
+        {0, 0}
+    };
+    uint8_t treg[target_regs_size(t)];
+    uint32_t regs[18] = {0};
+    target_regs_read(t, treg);
+    memcpy(regs, treg, 17 * sizeof(uint32_t));
+
+    struct corefile *cf = core_new(0x28); /* ARM */
+    core_note_add_prstatus(cf, SIGSEGV, regs);
+    int pmem = open("/dev/mem", O_RDWR | O_SYNC);
+    for (const struct section *s = sections; s->size; s++) {
+        cortexa_cache_clean(t, s->base, s->size);
+        volatile void *ptr = mmap(NULL, s->size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                  pmem, s->base);
+        core_add_ph(cf, PT_LOAD, s->base, (void*)ptr, s->size);
+    }
+    FILE *f = fopen("zynq_amp_core", "w");
+    core_dump(f, cf);
+    fclose(f);
+    close(pmem);
+}
