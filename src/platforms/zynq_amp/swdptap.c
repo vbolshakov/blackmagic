@@ -18,13 +18,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __GDB_IF_H
-#define __GDB_IF_H
+/* Quick hack for bit-banging SW-DP interface over FT2232.
+ * Intended as proof of concept, not for production.
+ */
 
-int gdb_if_init(void);
-unsigned char gdb_if_getchar(void);
-unsigned char gdb_if_getchar_to(int timeout);
-void gdb_if_putchar(unsigned char c, int flush);
+#include <stdio.h>
+#include <assert.h>
 
-#endif
+#include "general.h"
+#include "swdptap.h"
+
+
+int swdptap_init(void)
+{
+	return 0;
+}
+
+bool swdptap_bit_in(void)
+{
+	return 0;
+}
+
+void swdptap_bit_out(bool val)
+{
+	(void)val;
+}
 

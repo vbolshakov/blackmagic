@@ -52,7 +52,7 @@ int gdb_if_init(void)
 	int opt;
 
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(2000);
+	addr.sin_port = htons(2001);
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	assert((gdb_if_serv = socket(PF_INET, SOCK_STREAM, 0)) != -1);
@@ -63,7 +63,7 @@ int gdb_if_init(void)
 	assert(bind(gdb_if_serv, (void*)&addr, sizeof(addr)) != -1);
 	assert(listen(gdb_if_serv, 1) != -1);
 
-	DEBUG("Listening on TCP:2000\n");
+	DEBUG("Listening on TCP:2001\n");
 
 	return 0;
 }

@@ -18,13 +18,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __GDB_IF_H
-#define __GDB_IF_H
+#ifndef __PLATFORM_H
+#define __PLATFORM_H
 
-int gdb_if_init(void);
-unsigned char gdb_if_getchar(void);
-unsigned char gdb_if_getchar_to(int timeout);
-void gdb_if_putchar(unsigned char c, int flush);
+#include "timing.h"
+
+#define PLATFORM_HAS_DEBUG
+
+#define SET_RUN_STATE(state)
+#define SET_IDLE_STATE(state)
+#define SET_ERROR_STATE(state)
+
+static inline int platform_hwversion(void)
+{
+	        return 0;
+}
 
 #endif
 

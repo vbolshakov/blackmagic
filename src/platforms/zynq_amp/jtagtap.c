@@ -1,7 +1,7 @@
 /*
  * This file is part of the Black Magic Debug project.
  *
- * Copyright (C) 2011  Black Sphere Technologies Ltd.
+ * Copyright (C) 2008  Black Sphere Technologies Ltd.
  * Written by Gareth McMullin <gareth@blacksphere.co.nz>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -18,13 +18,35 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __GDB_IF_H
-#define __GDB_IF_H
+/* Low level JTAG implementation using FT2232 with libftdi.
+ *
+ * Issues:
+ * This code is old, rotten and unsupported.
+ * Magic numbers everywhere.
+ * Should share interface with swdptap.c or at least clean up...
+ */
 
-int gdb_if_init(void);
-unsigned char gdb_if_getchar(void);
-unsigned char gdb_if_getchar_to(int timeout);
-void gdb_if_putchar(unsigned char c, int flush);
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 
-#endif
+#include <assert.h>
+
+#include "general.h"
+#include "jtagtap.h"
+
+int jtagtap_init(void)
+{
+	return 0;
+}
+
+void jtagtap_reset(void)
+{
+}
+
+uint8_t jtagtap_next(uint8_t dTMS, uint8_t dTDO)
+{
+	(void)dTMS; (void)dTDO;
+	return 0;
+}
 

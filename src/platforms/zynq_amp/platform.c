@@ -17,14 +17,45 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "general.h"
+#include "gdb_if.h"
+#include "version.h"
 
-#ifndef __GDB_IF_H
-#define __GDB_IF_H
+#include <assert.h>
+#include <unistd.h>
+#include <sys/time.h>
 
-int gdb_if_init(void);
-unsigned char gdb_if_getchar(void);
-unsigned char gdb_if_getchar_to(int timeout);
-void gdb_if_putchar(unsigned char c, int flush);
+void platform_init(void)
+{
+	printf("\nBlack Magic Probe (" FIRMWARE_VERSION ")\n");
+	printf("Copyright (C) 2015  Black Sphere Technologies Ltd.\n");
+	printf("License GPLv3+: GNU GPL version 3 or later "
+	       "<http://gnu.org/licenses/gpl.html>\n\n");
 
-#endif
+	assert(gdb_if_init() == 0);
+}
+
+void platform_srst_set_val(bool assert)
+{
+	(void)assert;
+}
+
+bool platform_srst_get_val(void) { return false; }
+
+const char *platform_target_voltage(void)
+{
+	return "not supported";
+}
+
+void platform_delay(uint32_t ms)
+{
+	usleep(ms * 1000);
+}
+
+uint32_t platform_time_ms(void)
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (tv.tv_sec * 1000) + (tv.tv_usec / 1000);
+}
 
